@@ -3,12 +3,14 @@ const router = express.Router();
 const editorController = require("../controllers/editorController");
 const authenticate = require("../middlewares/authenticate");
 const authorize = require("../middlewares/authorize");
+const upload = require("../middlewares/upload");
 
 // ------------------ Create Editor (admin/manager) ------------------
 router.post(
   "/",
   authenticate,
   authorize(["admin", "manager"]),
+  upload.single("coverImage"),
   (req, res) => {
     // #swagger.tags = ['Editors']
     // #swagger.summary = 'Create a new editor'

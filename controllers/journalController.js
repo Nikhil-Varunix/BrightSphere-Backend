@@ -140,7 +140,7 @@ const getJournalFullDetails = async (req, res) => {
     const journalId = req.params.id;
 
     // 1️⃣ Find journal
-    const journal = await Journal.findById(journalId).lean();
+    const journal = await Journal.findById(journalId).populate("editors").lean();
     if (!journal) return errorResponse(res, "Journal not found", 404);
 
     // 2️⃣ Get all volumes of this journal

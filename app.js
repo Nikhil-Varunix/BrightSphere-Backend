@@ -13,6 +13,9 @@ const volumeRoutes = require("./routes/volumeRoutes");
 const issueRoutes = require("./routes/issueRoutes");
 const journalRoutes = require("./routes/journalRoutes");
 const articleRoutes = require("./routes/articleRoutes");
+const submissionRoutes = require("./routes/submissionRoutes");
+
+
 
 
 
@@ -35,6 +38,7 @@ app.use("/api/volumes", volumeRoutes);
 app.use("/api/issues", issueRoutes);
 app.use("/api/journals", journalRoutes);
 app.use("/api/articles", articleRoutes);
+app.use("/api/submissions", submissionRoutes);
 
 
 // Serve Swagger UI

@@ -5,8 +5,8 @@ const { logUserAction } = require("../utils/userActionLogger");
 // Create a new editor
 const createEditor = async (req, res) => {
   try {
-    const { firstName, lastName, email, designation, department, university, address, status } = req.body;
-
+    const { firstName, lastName, email, designation, department, university, address } = req.body;
+    const coverImage = `uploads/images/${req.file.filename}`;
     // Check if editor with same email exists
     const existing = await Editor.findOne({ email });
     if (existing) return errorResponse(res, "Editor with this email already exists", 400);
@@ -19,8 +19,9 @@ const createEditor = async (req, res) => {
       designation,
       department,
       university,
+      coverImage,
       address,
-      status: status !== undefined ? status : true,
+      status:  true,
       createdBy: req.user?._id, // store the creator
     });
 

@@ -8,6 +8,11 @@ const editorSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    coverImage: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     lastName: {
       type: String,
       required: true,
@@ -24,7 +29,7 @@ const editorSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    
+
     department: {
       type: String,
       trim: true,
