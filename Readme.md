@@ -35,9 +35,3 @@ mongodump --db RationCardGenerator --out /path/to/backup/
 mongorestore --db RationCardGenerator /path/to/backup/your_database_name/
 
 
-
-in a volume collection, the volume names should be unique if the journal is same 
-update the model based in the above sentence
-but if the journal id is different the volume name can be duplicated
-
-

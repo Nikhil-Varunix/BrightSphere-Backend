@@ -108,6 +108,45 @@ const getAllJournals = async (req, res) => {
   }
 };
 
+const getAllDeletedJournals = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const { search } = req.query;
+
+    const query = { isDeleted: true };
+
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { content: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const total = await Journal.countDocuments(query);
+
+    const journals = await Journal.find(query)
+      .populate("createdBy", "firstName lastName email")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    res.json({
+      success: true,
+      data: journals,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    errorResponse(res, "Failed to fetch journals", 500, err);
+  }
+};
+
 
 // ------------------ Get Journal by ID ------------------
 const getJournalById = async (req, res) => {
@@ -184,32 +223,24 @@ const getJournalFullDetails = async (req, res) => {
 
 
 
-
-//new method which finds all the volumes of the journal by id 
-
-//and all the issues of the volumes of that perticlular journal
-
-//and all the issues of that particular issue
-
-// use models to write this method
-// const Journal = require("../models/journalModel");
-// const Article = require("../models/articleModel");
-// const Volume = require("../models/volumeModel");
-// const Issue = require("../models/issueModel");
-
-
 // ------------------ Update Journal ------------------
 const updateJournal = async (req, res) => {
+  console.log("Update Journal req.body:", req);
   try {
-    const { title, content, coverImage, status } = req.body;
+    const { title, subTitle, content, editorials } = req.body;
 
     const journal = await Journal.findById(req.params.id);
     if (!journal) return errorResponse(res, "Journal not found", 404);
 
+    // Update basic fields
+
     journal.title = title ?? journal.title;
+    journal.subTitle = subTitle ?? journal.subTitle;
     journal.content = content ?? journal.content;
-    journal.coverImage = coverImage ?? journal.coverImage;
-    if (typeof status === "boolean") journal.status = status;
+
+    if (Array.isArray(editorials)) {
+      journal.editors = editorials; // array of editor IDs
+    }
 
     await journal.save();
 
@@ -223,7 +254,46 @@ const updateJournal = async (req, res) => {
 
     res.json({ success: true, data: journal });
   } catch (err) {
+    console.error(err);
     errorResponse(res, "Failed to update journal", 500, err);
+  }
+};
+
+// ------------------ Update Journal Image ------------------
+const updateJournalImage = async (req, res) => {
+  try {
+    const journalId = req.params.id;
+
+    if (!req.file) {
+      return errorResponse(res, "No image file uploaded", 400);
+    }
+
+    const journal = await Journal.findById(journalId);
+    if (!journal) {
+      return errorResponse(res, "Journal not found", 404);
+    }
+
+    // Save new cover image path
+
+    journal.coverImage = `uploads/images/${req.file.filename}`;
+    await journal.save();
+
+    await logUserAction({
+      userId: req.user?._id,
+      action: "Update Journal Cover Image",
+      model: "Journal",
+      details: { journalId },
+      req,
+    });
+
+    res.json({
+      success: true,
+      message: "Journal cover image updated successfully",
+      data: { coverImage: journal.coverImage },
+    });
+  } catch (err) {
+    console.error("Error updating journal image:", err);
+    errorResponse(res, "Failed to update journal image", 500, err);
   }
 };
 
@@ -233,9 +303,16 @@ const deleteJournal = async (req, res) => {
     const journal = await Journal.findById(req.params.id);
     if (!journal) return errorResponse(res, "Journal not found", 404);
 
+    // Soft delete the journal
     journal.isDeleted = true;
     await journal.save();
 
+    // Cascade soft delete to related volumes, issues, and articles
+    await Volume.updateMany({ journalId: journal._id }, { isDeleted: true });
+    await Issue.updateMany({ journalId: journal._id }, { isDeleted: true });
+    await Article.updateMany({ journalId: journal._id }, { isDeleted: true });
+
+    // Log user action
     await logUserAction({
       userId: req.user?._id,
       action: "Soft Delete Journal",
@@ -244,18 +321,63 @@ const deleteJournal = async (req, res) => {
       req,
     });
 
-    res.json({ success: true, message: "Journal soft deleted successfully" });
+    res.json({
+      success: true,
+      message: "Journal and related volumes, issues, and articles soft deleted successfully",
+    });
   } catch (err) {
     errorResponse(res, "Failed to delete journal", 500, err);
   }
 };
 
+// ------------------ Restore (Reactivate) Journal ------------------
+const restoreJournal = async (req, res) => {
+  try {
+    const journal = await Journal.findById(req.params.id);
+    if (!journal) return errorResponse(res, "Journal not found", 404);
+
+    // If journal is already active
+    if (!journal.isDeleted) {
+      return res.json({ success: true, message: "Journal is already active" });
+    }
+
+    // Reactivate the journal
+    journal.isDeleted = false;
+    await journal.save();
+
+    // Cascade reactivation to related volumes, issues, and articles
+    await Volume.updateMany({ journalId: journal._id }, { isDeleted: false });
+    await Issue.updateMany({ journalId: journal._id }, { isDeleted: false });
+    await Article.updateMany({ journalId: journal._id }, { isDeleted: false });
+
+    // Log user action
+    await logUserAction({
+      userId: req.user?._id,
+      action: "Restore Journal",
+      model: "Journal",
+      details: { journalId: journal._id },
+      req,
+    });
+
+    res.json({
+      success: true,
+      message: "Journal and related volumes, issues, and articles restored successfully",
+    });
+  } catch (err) {
+    errorResponse(res, "Failed to restore journal", 500, err);
+  }
+};
+
+
 module.exports = {
   createJournal,
   getJournals,
   getAllJournals,
+  getAllDeletedJournals,
   getJournalById,
   updateJournal,
+  updateJournalImage,
   deleteJournal,
   getJournalFullDetails,
+  restoreJournal,
 };

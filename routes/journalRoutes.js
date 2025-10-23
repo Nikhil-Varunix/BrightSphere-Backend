@@ -31,6 +31,14 @@ router.get("/all", (req, res) => {
     journalController.getAllJournals(req, res);
 });
 
+// ------------------ Get All Journals (deleted) ------------------
+router.get("/all/deleted", (req, res) => {
+    // #swagger.tags = ['Journals']
+    // #swagger.summary = 'Get all journals without pagination'
+    // #swagger.security = [{ "bearerAuth": [] }]
+    journalController.getAllDeletedJournals(req, res);
+});
+
 // ------------------ Get Journal by ID ------------------
 router.get("/:id", (req, res) => {
     // #swagger.tags = ['Journals']
@@ -47,12 +55,26 @@ router.get("/v2/:id", (req, res) => {
 });
 
 // ------------------ Update Journal by ID ------------------
-router.put("/:id", authenticate, authorize(["admin", "manager", "editor"]), (req, res) => {
+router.put("/update/:id", authenticate, authorize(["admin", "manager", "editor"]), (req, res) => {
     // #swagger.tags = ['Journals']
     // #swagger.summary = 'Update journal by ID'
     // #swagger.security = [{ "bearerAuth": [] }]
     journalController.updateJournal(req, res);
 });
+
+// ------------------ Update Journal Image ------------------
+router.put(
+  "/update/image/:id",
+  authenticate,
+  authorize(["admin", "manager", "editor"]),
+  upload.single("coverImage"),
+  (req, res) => {
+    // #swagger.tags = ['Journals']
+    // #swagger.summary = 'Update journal cover image'
+    // #swagger.security = [{ "bearerAuth": [] }]
+    journalController.updateJournalImage(req, res);
+  }
+);
 
 // ------------------ Delete Journal by ID ------------------
 router.delete("/:id", authenticate, authorize(["admin", "manager"]), (req, res) => {
@@ -61,5 +83,18 @@ router.delete("/:id", authenticate, authorize(["admin", "manager"]), (req, res) 
     // #swagger.security = [{ "bearerAuth": [] }]
     journalController.deleteJournal(req, res);
 });
+
+// ------------------ Restore Journal by ID ------------------
+router.put(
+  "/restore/:id",
+  authenticate,
+  authorize(["admin", "manager"]),
+  (req, res) => {
+    // #swagger.tags = ['Journals']
+    // #swagger.summary = 'Restore a soft-deleted journal by ID'
+    // #swagger.security = [{ "bearerAuth": [] }]
+    journalController.restoreJournal(req, res);
+  }
+);
 
 module.exports = router;
