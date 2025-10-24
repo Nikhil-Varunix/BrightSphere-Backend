@@ -55,7 +55,7 @@ router.get("/v2/:id", (req, res) => {
 });
 
 // ------------------ Update Journal by ID ------------------
-router.put("/update/:id", authenticate, authorize(["admin", "manager", "editor"]), (req, res) => {
+router.put("/update/:id", authenticate, authorize(["admin", "manager", "editor"]), upload.single("coverImage"), (req, res) => {
     // #swagger.tags = ['Journals']
     // #swagger.summary = 'Update journal by ID'
     // #swagger.security = [{ "bearerAuth": [] }]

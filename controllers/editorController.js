@@ -1,6 +1,9 @@
 const Editor = require("../models/editorModel");
+const Journal = require("../models/journalModel");
 const { errorResponse } = require("../utils/errorResponseHandler");
 const { logUserAction } = require("../utils/userActionLogger");
+const fs = require("fs");
+const path = require("path");
 
 // Create a new editor
 const createEditor = async (req, res) => {
@@ -87,38 +90,109 @@ const getEditors = async (req, res) => {
 // Get a single editor by ID
 const getEditorById = async (req, res) => {
   try {
-    const editor = await Editor.findById(req.params.id);
+    const editorId = req.params.id;
+
+    // Fetch editor and journals in parallel
+    const [editor, journals] = await Promise.all([
+      Editor.findById(editorId),
+      Journal.find({ editors: { $in: [editorId] }, isDeleted: false })
+    ]);
+
     if (!editor) return errorResponse(res, "Editor not found", 404);
 
-    res.json({ success: true, data: editor });
+    res.json({
+      success: true,
+      data: {
+        editor,
+        journals
+      }
+    });
   } catch (err) {
+    console.error("Failed to fetch editor:", err);
     errorResponse(res, "Failed to fetch editor", 500, err);
   }
 };
 
-// Update an editor
+
+// 🧩 Update an editor
 const updateEditor = async (req, res) => {
   try {
-    const editor = await Editor.findById(req.params.id);
+    const editorId = req.params.id;
+    const editor = await Editor.findById(editorId);
+
     if (!editor) return errorResponse(res, "Editor not found", 404);
 
-    const updates = { ...req.body };
-    Object.assign(editor, updates);
+    // ---- Extract fields from body ----
+    const {
+      firstName,
+      lastName,
+      email,
+      designation,
+      department,
+      university,
+      address,
+      status,
+      isActive,
+      isDeleted,
+    } = req.body;
+
+    // ---- Apply updates only if present ----
+    if (firstName) editor.firstName = firstName;
+    if (lastName) editor.lastName = lastName;
+    if (email) editor.email = email;
+    if (designation) editor.designation = designation;
+    if (department) editor.department = department;
+    if (university) editor.university = university;
+    if (address) editor.address = address;
+    if (status !== undefined) editor.status = status === "Active" || status === true;
+    if (isActive !== undefined) editor.isActive = isActive;
+    if (isDeleted !== undefined) editor.isDeleted = isDeleted;
+
+    // ---- Handle profile image upload ----
+    if (req.file) {
+      // Remove old image if it exists
+      if (editor.coverImage) {
+        const oldImagePath = path.join(process.cwd(), editor.coverImage);
+        try {
+          if (fs.existsSync(oldImagePath)) {
+            fs.unlinkSync(oldImagePath);
+            console.log("✅ Old editor image deleted:", oldImagePath);
+          }
+        } catch (unlinkErr) {
+          console.error("⚠️ Failed to delete old image:", unlinkErr);
+        }
+      }
+
+      // Save new image path
+      editor.coverImage = `uploads/images/${req.file.filename}`;
+    }
+
+    // ---- Save updated editor ----
     await editor.save();
 
+    // ---- Log user action ----
     await logUserAction({
       userId: req.user?._id || null,
-      action: "Update Editor",
+      action: req.file ? "Update Editor + Profile Image" : "Update Editor",
       model: "Editor",
       details: { editorId: editor._id },
       req,
     });
 
-    res.json({ success: true, data: editor });
+    // ---- Send response ----
+    res.json({
+      success: true,
+      message: req.file
+        ? "Editor and profile image updated successfully"
+        : "Editor updated successfully",
+      data: editor,
+    });
   } catch (err) {
+    console.error("❌ Error updating editor:", err);
     errorResponse(res, "Failed to update editor", 500, err);
   }
 };
+
 
 // Soft delete an editor
 const deleteEditor = async (req, res) => {
@@ -169,6 +243,6 @@ const getAllEditors = async (req, res) => {
   }
 };
 
-module.exports = { getAllEditors };
+module.exports = {  };
 
-module.exports = { createEditor, updateEditor, deleteEditor, getEditors, getEditorById };
+module.exports = { createEditor, updateEditor, getAllEditors, deleteEditor, getEditors, getEditorById };

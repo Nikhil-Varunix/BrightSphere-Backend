@@ -21,6 +21,10 @@ const journalSchema = new mongoose.Schema(
       type: String, 
       trim: true,
     },
+    issn: {
+      type: String, 
+      trim: true,
+    },
     editors: [
       {
         type: mongoose.Schema.Types.ObjectId,

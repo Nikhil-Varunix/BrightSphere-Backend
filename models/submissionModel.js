@@ -41,8 +41,8 @@ const submissionSchema = new mongoose.Schema(
       required: [true, "Article type is required"],
     },
     journal: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Journal",
+      type: String,
+      trim: true,
       required: [true, "Journal is required"],
     },
     abstract: {

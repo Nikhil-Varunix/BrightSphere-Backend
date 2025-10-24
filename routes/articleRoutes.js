@@ -66,7 +66,7 @@ router.get(
 
 // ------------------ Update Article by ID ------------------
 router.put(
-  "/:id",
+  "/update/:id",
   authenticate,
   authorize(["admin", "editor"]),
   upload.single("coverImage"),

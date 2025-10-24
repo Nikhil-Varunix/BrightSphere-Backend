@@ -1,4 +1,6 @@
 // controllers/articleController.js
+const fs = require("fs");
+const path = require("path");
 const Article = require("../models/articleModel");
 const { errorResponse } = require("../utils/errorResponseHandler");
 const { logUserAction } = require("../utils/userActionLogger");
@@ -117,35 +119,70 @@ const getArticleById = async (req, res) => {
   }
 };
 
-// Update an article
+
 const updateArticle = async (req, res) => {
   try {
-    const article = await Article.findById(req.params.id);
+    const articleId = req.params.id;
+    const article = await Article.findById(articleId);
     if (!article) return errorResponse(res, "Article not found", 404);
 
-    const updates = { ...req.body };
+    // ---- Update fields from body ----
+    const { title, author, content, journal, volume, issue, articleType, externalLink, status } = req.body;
 
+    if (title) article.title = title;
+    if (author) article.author = author;
+    if (content) article.content = content;
+    if (journal) article.journal = journal;
+    if (volume) article.volume = volume;
+    if (issue) article.issue = issue;
+    if (articleType) article.articleType = articleType;
+    if (externalLink) article.externalLink = externalLink;
+    if (status) article.status = status;
+
+    // ---- Handle cover image ----
     if (req.file) {
-      updates.coverImage = req.file.path;
+      // Remove old image if exists
+      if (article.coverImage) {
+        const oldImagePath = path.join(process.cwd(), article.coverImage);
+        try {
+          if (fs.existsSync(oldImagePath)) {
+            fs.unlinkSync(oldImagePath);
+            console.log("✅ Old cover image deleted:", oldImagePath);
+          }
+        } catch (unlinkErr) {
+          console.error("⚠️ Failed to delete old image:", unlinkErr);
+        }
+      }
+      // Save new image
+      article.coverImage = `uploads/images/${req.file.filename}`;
     }
 
-    Object.assign(article, updates);
     await article.save();
 
+    // ---- Log user action ----
     await logUserAction({
       userId: req.user?._id || null,
-      action: "Update Article",
+      action: req.file ? "Update Article + Cover Image" : "Update Article",
       model: "Article",
       details: { articleId: article._id },
       req,
     });
 
-    res.json({ success: true, data: article });
+    res.json({
+      success: true,
+      message: req.file
+        ? "Article and cover image updated successfully"
+        : "Article updated successfully",
+      data: article,
+    });
+
   } catch (err) {
-    console.error(err);
+    console.error("Error updating article:", err);
     errorResponse(res, "Failed to update article", 500, err);
   }
 };
+
+
 
 // Soft delete an article
 const deleteArticle = async (req, res) => {
@@ -215,5 +252,6 @@ module.exports = {
   getArticleById,
   updateArticle,
   deleteArticle,
-  incrementDownload, // export it
+  updateArticle,
+  incrementDownload, 
 };

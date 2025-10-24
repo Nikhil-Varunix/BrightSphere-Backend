@@ -60,9 +60,10 @@ router.get(
 
 // ------------------ Update Editor by ID ------------------
 router.put(
-  "/:id",
+  "/update/:id",
   authenticate,
   authorize(["admin", "manager"]),
+  upload.single("coverImage"),
   (req, res) => {
     // #swagger.tags = ['Editors']
     // #swagger.summary = 'Update editor by ID'

@@ -5,10 +5,12 @@ const Volume = require("../models/volumeModel");
 const Issue = require("../models/issueModel");
 const { errorResponse } = require("../utils/errorResponseHandler");
 const { logUserAction } = require("../utils/userActionLogger");
+const fs = require("fs");
+const path = require("path");
 
 const createJournal = async (req, res) => {
   try {
-    const { title, content, subTitle, editors } = req.body;
+    const { title, content, subTitle, editors, issn } = req.body;
     const coverImage = `uploads/images/${req.file.filename}`;
 
     if (!title) return errorResponse(res, "Journal title is required", 400);
@@ -30,6 +32,7 @@ const createJournal = async (req, res) => {
     const journal = await Journal.create({
       title,
       subTitle,
+      issn,
       content,
       coverImage,
       editors: editorsArray, // ✅ save editors
@@ -220,82 +223,74 @@ const getJournalFullDetails = async (req, res) => {
 };
 
 
-
-
-
-// ------------------ Update Journal ------------------
+// ------------------ Update Journal (Combined + Delete Old Image) ------------------
 const updateJournal = async (req, res) => {
-  console.log("Update Journal req.body:", req);
   try {
-    const { title, subTitle, content, editorials } = req.body;
+    const journalId = req.params.id;
+    const { title, subTitle,issn,  content, editorials } = req.body;
 
-    const journal = await Journal.findById(req.params.id);
+    // Check if journal exists
+    const journal = await Journal.findById(journalId);
     if (!journal) return errorResponse(res, "Journal not found", 404);
 
-    // Update basic fields
+    // ---- Update text fields ----
+    if (title) journal.title = title;
+    if (subTitle) journal.subTitle = subTitle;
+    if (content) journal.content = content;
+    if (issn) journal.issn = issn;
 
-    journal.title = title ?? journal.title;
-    journal.subTitle = subTitle ?? journal.subTitle;
-    journal.content = content ?? journal.content;
-
+    // ---- Update editorials ----
     if (Array.isArray(editorials)) {
-      journal.editors = editorials; // array of editor IDs
+      journal.editors = editorials;
     }
 
+    // ---- Update image if provided ----
+    if (req.file) {
+      // Remove old image if it exists
+      if (journal.coverImage) {
+        const oldImagePath = path.join(process.cwd(), journal.coverImage);
+        try {
+          if (fs.existsSync(oldImagePath)) {
+            fs.unlinkSync(oldImagePath);
+            console.log("✅ Old cover image deleted:", oldImagePath);
+          }
+        } catch (unlinkErr) {
+          console.error("⚠️ Failed to delete old image:", unlinkErr);
+        }
+      }
+
+      // Save new image
+      journal.coverImage = `uploads/images/${req.file.filename}`;
+    }
+
+    // ---- Save journal ----
     await journal.save();
 
+    // ---- Log user action ----
     await logUserAction({
       userId: req.user?._id,
-      action: "Update Journal",
+      action: req.file ? "Update Journal + Cover Image" : "Update Journal",
       model: "Journal",
       details: { journalId: journal._id },
       req,
     });
 
-    res.json({ success: true, data: journal });
+    // ---- Response ----
+    res.json({
+      success: true,
+      message: req.file
+        ? "Journal and cover image updated successfully"
+        : "Journal updated successfully",
+      data: journal,
+    });
   } catch (err) {
-    console.error(err);
+    console.error("Error updating journal:", err);
     errorResponse(res, "Failed to update journal", 500, err);
   }
 };
 
-// ------------------ Update Journal Image ------------------
-const updateJournalImage = async (req, res) => {
-  try {
-    const journalId = req.params.id;
 
-    if (!req.file) {
-      return errorResponse(res, "No image file uploaded", 400);
-    }
 
-    const journal = await Journal.findById(journalId);
-    if (!journal) {
-      return errorResponse(res, "Journal not found", 404);
-    }
-
-    // Save new cover image path
-
-    journal.coverImage = `uploads/images/${req.file.filename}`;
-    await journal.save();
-
-    await logUserAction({
-      userId: req.user?._id,
-      action: "Update Journal Cover Image",
-      model: "Journal",
-      details: { journalId },
-      req,
-    });
-
-    res.json({
-      success: true,
-      message: "Journal cover image updated successfully",
-      data: { coverImage: journal.coverImage },
-    });
-  } catch (err) {
-    console.error("Error updating journal image:", err);
-    errorResponse(res, "Failed to update journal image", 500, err);
-  }
-};
 
 // ------------------ Soft Delete Journal ------------------
 const deleteJournal = async (req, res) => {
@@ -376,7 +371,7 @@ module.exports = {
   getAllDeletedJournals,
   getJournalById,
   updateJournal,
-  updateJournalImage,
+  // updateJournalImage,
   deleteJournal,
   getJournalFullDetails,
   restoreJournal,

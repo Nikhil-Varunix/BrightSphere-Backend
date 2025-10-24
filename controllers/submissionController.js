@@ -104,7 +104,6 @@ const getAllSubmissions = async (req, res) => {
 
     // Fetch paginated submissions
     const submissions = await Submission.find(searchQuery)
-      .populate("journal", "title")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(pageSize);
