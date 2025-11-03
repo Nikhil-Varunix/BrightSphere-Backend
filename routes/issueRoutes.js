@@ -21,11 +21,17 @@ router.get("/", authenticate, authorize(["admin", "manager"]), (req, res) => {
 });
 
 // ------------------ Get Issues by Volume ------------------
-router.get(
-  "/by-volume/:id",
-  authenticate,
-  issueController.getIssuesByVolume
-);
+router.get("/by-volume/:id", authenticate, (req, res) => {
+  // #swagger.tags = ['Issues']
+  // #swagger.summary = 'Get all Issues by Volume ID'
+  // #swagger.security = [{ "bearerAuth": [] }]
+  issueController.getIssuesByVolume(req, res);
+});
+// router.get(
+//   "/by-volume/:id",
+//   authenticate,
+//   issueController.getIssuesByVolume
+// );
 
 // ------------------ Get Issue by ID ------------------
 router.get("/:id", authenticate, authorize(["admin", "manager"]), (req, res) => {

@@ -4,7 +4,7 @@
     "title": "Service Nxt API",
     "description": "API Documentation with Authorization",
     "version": "1.0.0",
-    "x-totalApis": 37
+    "x-totalApis": 42
   },
   "host": "localhost:8002",
   "basePath": "/",
@@ -830,11 +830,11 @@
           }
         ]
       },
-      "put": {
+      "delete": {
         "tags": [
           "Editors"
         ],
-        "summary": "Update editor by ID",
+        "summary": "Soft delete editor by ID",
         "description": "",
         "parameters": [
           {
@@ -868,12 +868,14 @@
             "bearerAuth": []
           }
         ]
-      },
-      "delete": {
+      }
+    },
+    "/api/editors/update/{id}": {
+      "put": {
         "tags": [
           "Editors"
         ],
-        "summary": "Soft delete editor by ID",
+        "summary": "Update editor by ID",
         "description": "",
         "parameters": [
           {
@@ -886,6 +888,45 @@
             "name": "authorization",
             "in": "header",
             "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "firstName": {
+                  "example": "any"
+                },
+                "lastName": {
+                  "example": "any"
+                },
+                "email": {
+                  "example": "any"
+                },
+                "designation": {
+                  "example": "any"
+                },
+                "department": {
+                  "example": "any"
+                },
+                "university": {
+                  "example": "any"
+                },
+                "address": {
+                  "example": "any"
+                },
+                "status": {
+                  "example": "any"
+                },
+                "isActive": {
+                  "example": "any"
+                },
+                "isDeleted": {
+                  "example": "any"
+                }
+              }
+            }
           }
         ],
         "responses": {
@@ -1275,6 +1316,10 @@
     },
     "/api/issues/by-volume/{id}": {
       "get": {
+        "tags": [
+          "Issues"
+        ],
+        "summary": "Get all Issues by Volume ID",
         "description": "",
         "parameters": [
           {
@@ -1299,7 +1344,12 @@
           "500": {
             "description": "Internal Server Error"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/issues/{id}": {
@@ -1451,6 +1501,9 @@
                 },
                 "editors": {
                   "example": "any"
+                },
+                "issn": {
+                  "example": "any"
                 }
               }
             }
@@ -1592,66 +1645,6 @@
           }
         ]
       },
-      "put": {
-        "tags": [
-          "Journals"
-        ],
-        "summary": "Update journal by ID",
-        "description": "",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "title": {
-                  "example": "any"
-                },
-                "content": {
-                  "example": "any"
-                },
-                "coverImage": {
-                  "example": "any"
-                },
-                "status": {
-                  "example": "any"
-                }
-              }
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "500": {
-            "description": "Internal Server Error"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      },
       "delete": {
         "tags": [
           "Journals"
@@ -1710,6 +1703,109 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/journals/update/{id}": {
+      "put": {
+        "tags": [
+          "Journals"
+        ],
+        "summary": "Update journal by ID",
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "example": "any"
+                },
+                "subTitle": {
+                  "example": "any"
+                },
+                "issn": {
+                  "example": "any"
+                },
+                "content": {
+                  "example": "any"
+                },
+                "editorials": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/journals/update/image/{id}": {
+      "put": {
+        "tags": [
+          "Journals"
+        ],
+        "summary": "Update journal cover image",
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "500": {
+            "description": "Internal Server Error"
           }
         },
         "security": [
@@ -1946,11 +2042,11 @@
           }
         ]
       },
-      "put": {
+      "delete": {
         "tags": [
           "Articles"
         ],
-        "summary": "Update article by ID",
+        "summary": "Soft delete article by ID",
         "description": "",
         "parameters": [
           {
@@ -1984,12 +2080,14 @@
             "bearerAuth": []
           }
         ]
-      },
-      "delete": {
+      }
+    },
+    "/api/articles/update/{id}": {
+      "put": {
         "tags": [
           "Articles"
         ],
-        "summary": "Soft delete article by ID",
+        "summary": "Update article by ID",
         "description": "",
         "parameters": [
           {
@@ -2002,6 +2100,42 @@
             "name": "authorization",
             "in": "header",
             "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "example": "any"
+                },
+                "author": {
+                  "example": "any"
+                },
+                "content": {
+                  "example": "any"
+                },
+                "journal": {
+                  "example": "any"
+                },
+                "volume": {
+                  "example": "any"
+                },
+                "issue": {
+                  "example": "any"
+                },
+                "articleType": {
+                  "example": "any"
+                },
+                "externalLink": {
+                  "example": "any"
+                },
+                "status": {
+                  "example": "any"
+                }
+              }
+            }
           }
         ],
         "responses": {
@@ -2228,6 +2362,36 @@
             "bearerAuth": []
           }
         ]
+      }
+    },
+    "/api/dashboard/stats": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Get overall dashboard statistics (counts, downloads, views, etc.)",
+        "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
       }
     }
   }
