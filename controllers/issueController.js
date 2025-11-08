@@ -84,11 +84,12 @@ const getIssues = async (req, res) => {
 // ------------------ Get Issues by Volume ------------------
 const getIssuesByVolume = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params; // Volume ID
 
     const issues = await Issue.find({
       volume: id,
-      isDeleted: false,
+      status: true,      // ✅ Only active issues
+      isDeleted: false,  // ✅ Only non-deleted
     })
       .populate("volume", "volumeName")
       .sort({ createdAt: -1 });
@@ -98,9 +99,12 @@ const getIssuesByVolume = async (req, res) => {
       data: issues,
     });
   } catch (err) {
+    console.error("Failed to fetch issues for this volume:", err);
     errorResponse(res, "Failed to fetch issues for this volume", 500, err);
   }
 };
+
+
 
 // ------------------ Get Issue by ID ------------------
 const getIssueById = async (req, res) => {
@@ -117,26 +121,44 @@ const getIssueById = async (req, res) => {
 // ------------------ Update Issue ------------------
 const updateIssue = async (req, res) => {
   try {
-    const issue = await Issue.findById(req.params.id);
-    if (!issue || issue.isDeleted) return errorResponse(res, "Issue not found", 404);
+    const { issueName, status } = req.body;
 
-    const updates = { ...req.body, updatedBy: req.user?._id };
-    Object.assign(issue, updates);
+    // Find issue
+    const issue = await Issue.findById(req.params.id);
+    if (!issue || issue.isDeleted)
+      return errorResponse(res, "Issue not found", 404);
+
+    // Update fields safely
+    if (issueName) issue.issueName = issueName.trim();
+    if (typeof status === "boolean") issue.status = status;
+
+    // Record who updated it
+    issue.updatedBy = req.user?._id;
     await issue.save();
 
+    // Log user action
     await logUserAction({
       userId: req.user?._id,
       action: "Update Issue",
       model: "Issue",
-      details: { issueId: issue._id },
+      details: {
+        issueId: issue._id,
+        updatedFields: { issueName, status },
+      },
       req,
     });
 
-    res.json({ success: true, data: issue });
+    res.json({
+      success: true,
+      message: "Issue updated successfully",
+      data: issue,
+    });
   } catch (err) {
+    console.error("Failed to update issue:", err);
     errorResponse(res, "Failed to update issue", 500, err);
   }
 };
+
 
 // ------------------ Soft Delete Issue ------------------
 const deleteIssue = async (req, res) => {

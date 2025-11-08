@@ -1,5 +1,7 @@
 const Volume = require("../models/volumeModel");
 const Journal = require("../models/journalModel");
+const Issue = require("../models/issueModel");     
+const Article = require("../models/articleModel"); 
 const { errorResponse } = require("../utils/errorResponseHandler");
 const { logUserAction } = require("../utils/userActionLogger");
 
@@ -89,23 +91,81 @@ const getVolumes = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     const { search } = req.query;
-    const query = { isDeleted: false };
 
+    const matchStage = { isDeleted: false };
+
+    // Base aggregation
+    const pipeline = [
+      {
+        $lookup: {
+          from: "journals",
+          localField: "journal",
+          foreignField: "_id",
+          as: "journal",
+        },
+      },
+      { $unwind: { path: "$journal", preserveNullAndEmptyArrays: true } },
+    ];
+
+    // Add search condition if applicable
     if (search) {
-      query.$or = [
-        { volumeName: { $regex: search, $options: "i" } },
-      ];
+      pipeline.push({
+        $match: {
+          ...matchStage,
+          $or: [
+            { volumeName: { $regex: search, $options: "i" } },
+            { "journal.title": { $regex: search, $options: "i" } },
+          ],
+        },
+      });
+    } else {
+      pipeline.push({ $match: matchStage });
     }
 
-    const total = await Volume.countDocuments(query);
+    // Sort, paginate, and populate createdBy / updatedBy
+    pipeline.push(
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: "users",
+          localField: "createdBy",
+          foreignField: "_id",
+          as: "createdBy",
+        },
+      },
+      { $unwind: { path: "$createdBy", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "updatedBy",
+          foreignField: "_id",
+          as: "updatedBy",
+        },
+      },
+      { $unwind: { path: "$updatedBy", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          volumeName: 1,
+           status: 1,
+          journal: { title: 1, _id: 1 },
+          createdBy: { firstName: 1, lastName: 1, email: 1 },
+          updatedBy: { firstName: 1, lastName: 1, email: 1 },
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      }
+    );
 
-    const volumes = await Volume.find(query)
-      .populate("journal", "title")
-      .populate("createdBy", "firstName lastName email")
-      .populate("updatedBy", "firstName lastName email")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    // Execute aggregation
+    const volumes = await Volume.aggregate(pipeline);
+
+    // Get total count for pagination
+    const totalPipeline = [...pipeline.filter((p) => !("$skip" in p || "$limit" in p))];
+    totalPipeline.push({ $count: "total" });
+    const totalCountResult = await Volume.aggregate(totalPipeline);
+    const total = totalCountResult[0]?.total || 0;
 
     res.json({
       success: true,
@@ -118,7 +178,12 @@ const getVolumes = async (req, res) => {
       },
     });
   } catch (err) {
-    errorResponse(res, "Failed to fetch volumes", 500, err);
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch volumes",
+      error: err.message,
+    });
   }
 };
 
@@ -128,11 +193,12 @@ const getVolumes = async (req, res) => {
 // ------------------ Get Volumes by Journal ------------------
 const getVolumesByJournal = async (req, res) => {
   try {
-    const { id } = req.params; // journal ID
+    const { id } = req.params; // Journal ID
 
     const volumes = await Volume.find({
       journal: id,
-      isDeleted: false,
+      status: true,      // ✅ Only active volumes
+      isDeleted: false,  // ✅ Only non-deleted
     })
       .populate("journal", "journalName")
       .populate("createdBy", "firstName lastName email")
@@ -143,9 +209,11 @@ const getVolumesByJournal = async (req, res) => {
       data: volumes,
     });
   } catch (err) {
+    console.error("Failed to fetch volumes:", err);
     errorResponse(res, "Failed to fetch volumes", 500, err);
   }
 };
+
 
 
 // ------------------ Get a Single Volume by ID ------------------
@@ -166,49 +234,116 @@ const getVolumeById = async (req, res) => {
 // ------------------ Update a Volume ------------------
 const updateVolume = async (req, res) => {
   try {
-    const volume = await Volume.findById(req.params.id);
-    if (!volume || volume.isDeleted) return errorResponse(res, "Volume not found", 404);
+    const { id } = req.params;
+    const { volumeName, status } = req.body;
 
-    const updates = { ...req.body, updatedBy: req.user?._id };
-    Object.assign(volume, updates);
+    const volume = await Volume.findById(id);
+    if (!volume || volume.isDeleted)
+      return errorResponse(res, "Volume not found", 404);
+
+    if (volumeName) volume.volumeName = volumeName.trim();
+    if (typeof status === "boolean") volume.status = status;
+
     await volume.save();
 
     await logUserAction({
       userId: req.user?._id,
       action: "Update Volume",
       model: "Volume",
-      details: { volumeId: volume._id },
+      details: { volumeId: id, newValues: { volumeName, status } },
       req,
     });
 
-    res.json({ success: true, data: volume });
+    res.json({ success: true, message: "Volume updated successfully", data: volume });
   } catch (err) {
+    console.error("Failed to update volume:", err);
     errorResponse(res, "Failed to update volume", 500, err);
   }
 };
+
 
 // ------------------ Delete a Volume (Soft Delete) ------------------
 const deleteVolume = async (req, res) => {
   try {
     const volume = await Volume.findById(req.params.id);
-    if (!volume || volume.isDeleted) return errorResponse(res, "Volume not found", 404);
+    if (!volume || volume.isDeleted)
+      return errorResponse(res, "Volume not found", 404);
 
+    // Soft delete the volume
     volume.isDeleted = true;
     await volume.save();
 
+    // ✅ Remove this volume ID from the parent journal's volumes array
+    await Journal.findByIdAndUpdate(volume.journal, {
+      $pull: { volumes: volume._id },
+    });
+
+    // ✅ Cascade soft delete to related issues and articles
+    await Issue.updateMany({ volume: volume._id }, { isDeleted: true });
+    await Article.updateMany({ volume: volume._id }, { isDeleted: true });
+
+    // ✅ Log user action
     await logUserAction({
       userId: req.user?._id,
-      action: "Delete Volume",
+      action: "Soft Delete Volume",
       model: "Volume",
-      details: { volumeId: volume._id },
+      details: { volumeId: volume._id, journalId: volume.journal },
       req,
     });
 
-    res.json({ success: true, message: "Volume deleted successfully" });
+    res.json({
+      success: true,
+      message:
+        "Volume removed from journal and related issues/articles soft deleted successfully",
+    });
   } catch (err) {
+    console.error("Failed to delete volume:", err);
     errorResponse(res, "Failed to delete volume", 500, err);
   }
 };
+
+const restoreVolume = async (req, res) => {
+  try {
+    const volume = await Volume.findById(req.params.id);
+    if (!volume) return errorResponse(res, "Volume not found", 404);
+
+    if (!volume.isDeleted) {
+      return res.json({ success: true, message: "Volume is already active" });
+    }
+
+    // Reactivate the volume
+    volume.isDeleted = false;
+    await volume.save();
+
+    // ✅ Add it back to the journal if missing
+    await Journal.findByIdAndUpdate(volume.journal, {
+      $addToSet: { volumes: volume._id },
+    });
+
+    // ✅ Cascade restore to related issues and articles
+    await Issue.updateMany({ volume: volume._id }, { isDeleted: false });
+    await Article.updateMany({ volume: volume._id }, { isDeleted: false });
+
+    // ✅ Log user action
+    await logUserAction({
+      userId: req.user?._id,
+      action: "Restore Volume",
+      model: "Volume",
+      details: { volumeId: volume._id, journalId: volume.journal },
+      req,
+    });
+
+    res.json({
+      success: true,
+      message:
+        "Volume restored and re-linked to journal. Related issues and articles reactivated.",
+    });
+  } catch (err) {
+    console.error("Failed to restore volume:", err);
+    errorResponse(res, "Failed to restore volume", 500, err);
+  }
+};
+
 
 module.exports = {
   createVolume,

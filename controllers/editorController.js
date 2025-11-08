@@ -9,7 +9,7 @@ const path = require("path");
 const createEditor = async (req, res) => {
   try {
     const { firstName, lastName, email, designation, department, university, address } = req.body;
-    const coverImage = `uploads/images/${req.file.filename}`;
+    const coverImage = req?.file?.filename ?`uploads/images/${req.file.filename}`:"https://admin.brightsphereinsights.com/assets/images/user/avatar-1.jpg";
     // Check if editor with same email exists
     const existing = await Editor.findOne({ email });
     if (existing) return errorResponse(res, "Editor with this email already exists", 400);

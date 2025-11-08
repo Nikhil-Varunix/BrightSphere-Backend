@@ -31,6 +31,25 @@ router.get(
   }
 );
 
+
+
+// Restore Deleted Article
+router.put(
+  "/restore/:id",
+  authenticate,
+  authorize(["admin"]),
+  articleController.restoreArticle
+);
+
+// Get All Deleted Articles
+router.get(
+  "/deleted",
+  authenticate,
+  authorize(["admin", "editor"]),
+  articleController.getDeletedArticles
+);
+
+
 // ------------------ Increment Download Count ------------------
 router.patch(
   "/download/:id",

@@ -94,12 +94,17 @@ const getJournals = async (req, res) => {
   }
 };
 
-// ------------------ Get All Journals (no pagination, no search) ------------------
+// ------------------ Get All Journals (with populated volumes) ------------------
 const getAllJournals = async (req, res) => {
   try {
     const journals = await Journal.find({ isDeleted: false })
       .populate("createdBy", "firstName lastName email")
       .populate("editors", "firstName lastName email")
+      .populate({
+        path: "volumes",
+        match: { isDeleted: false }, // ✅ only show active volumes
+        select: "volumeName isDeleted", // ✅ only needed fields
+      })
       .sort({ createdAt: -1 });
 
     res.json({
@@ -107,9 +112,11 @@ const getAllJournals = async (req, res) => {
       data: journals,
     });
   } catch (err) {
+    console.error("Failed to fetch journals:", err);
     errorResponse(res, "Failed to fetch all journals", 500, err);
   }
 };
+
 
 const getAllDeletedJournals = async (req, res) => {
   try {
@@ -186,10 +193,10 @@ const getJournalFullDetails = async (req, res) => {
     if (!journal) return errorResponse(res, "Journal not found", 404);
 
     // 2️⃣ Get all volumes of this journal
-    const volumes = await Volume.find({ journal: journal._id, isDeleted: false }).lean();
+    const volumes = await Volume.find({ journal: journal._id, isDeleted: false, status:true }).lean();
 
     // 3️⃣ Get all issues of this journal
-    const allIssues = await Issue.find({ journal: journal._id, isDeleted: false })
+    const allIssues = await Issue.find({ journal: journal._id, isDeleted: false, status:true })
       .select("_id issueName createdAt status volume")
       .lean();
 
@@ -362,6 +369,7 @@ const restoreJournal = async (req, res) => {
     errorResponse(res, "Failed to restore journal", 500, err);
   }
 };
+
 
 
 module.exports = {

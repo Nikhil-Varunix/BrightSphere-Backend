@@ -15,6 +15,7 @@ const journalRoutes = require("./routes/journalRoutes");
 const articleRoutes = require("./routes/articleRoutes");
 const submissionRoutes = require("./routes/submissionRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const inpressArticleRoutes = require("./routes/inpressArticleRoutes");
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/api/journals", journalRoutes);
 app.use("/api/articles", articleRoutes);
 app.use("/api/submissions", submissionRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/inpress-articles", inpressArticleRoutes);
 
 
 // Serve Swagger UI

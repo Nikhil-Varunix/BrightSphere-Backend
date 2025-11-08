@@ -245,7 +245,89 @@ const incrementViewCount = async (req, res) => {
 };
 
 
+
+
+// ------------------ Restore (Reactivate) Article ------------------
+const restoreArticle = async (req, res) => {
+  try {
+    const article = await Article.findById(req.params.id);
+    if (!article) return errorResponse(res, "Article not found", 404);
+
+    // If already active
+    if (!article.isDeleted) {
+      return res.json({
+        success: true,
+        message: "Article is already active",
+      });
+    }
+
+    // Reactivate article
+    article.isDeleted = false;
+    await article.save();
+
+    // Log user action
+    await logUserAction({
+      userId: req.user?._id,
+      action: "Restore Article",
+      model: "Article",
+      details: { articleId: article._id },
+      req,
+    });
+
+    res.json({
+      success: true,
+      message: "Article restored successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    errorResponse(res, "Failed to restore article", 500, err);
+  }
+};
+
+// ------------------ Get All Deleted Articles ------------------
+const getDeletedArticles = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const search = req.query.search || "";
+
+    const query = {
+      isDeleted: true,
+      $or: [
+        { title: { $regex: search, $options: "i" } },
+        { author: { $regex: search, $options: "i" } },
+      ],
+    };
+
+    const total = await Article.countDocuments(query);
+
+    const articles = await Article.find(query)
+      .populate("journal", "title")
+      .populate("createdBy", "firstName lastName email")
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    res.json({
+      success: true,
+      data: articles,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    errorResponse(res, "Failed to fetch deleted articles", 500, err);
+  }
+};
+
 module.exports = {
+  restoreArticle,
+  getDeletedArticles,
   createArticle,
   incrementViewCount,
   getArticles,

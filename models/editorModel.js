@@ -10,7 +10,6 @@ const editorSchema = new mongoose.Schema(
     },
     coverImage: {
       type: String,
-      required: true,
       trim: true,
     },
     lastName: {
